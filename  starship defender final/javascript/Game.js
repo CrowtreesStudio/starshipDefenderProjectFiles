@@ -43,6 +43,11 @@ BasicGame.Game.prototype = {
         this.load.image('bullet', 'assets/sprites/bullet.png');
         this.load.spritesheet('enemy', 'assets/sprites/enemy01.png', 32, 32);
         this.load.spritesheet('explosion', 'assets/sprites/explosion.png', 32, 32);
+        this.load.audio('laserShot', 'assets/sfx/Laser.Shoot.m4a',
+                        'assets/sfx/Laser.Shoot.m4a');
+        this.load.audio('explosion', 'assets/sfx/Explosion.m4a',
+                        'assets/sfx/Explosion.m4a');
+        this.load.audio('music', 'assets/music/Star.Command.John.Rawman.mp3');
 	},
     
     
@@ -55,7 +60,7 @@ BasicGame.Game.prototype = {
         this.player = this.add.sprite(this.world.centerX, 550, 'player');
         this.player.anchor.setTo(0.5, 0.5);
         this.player.animations.add('fly', [0, 1, 2], 30, true);
-//        this.player.play('fly');
+        this.player.play('fly');
         this.physics.arcade.enable(this.player);
         this.player.body.collideWorldBounds = true;
         
@@ -88,7 +93,13 @@ BasicGame.Game.prototype = {
         this.explosionGrp.forEach(function(member){
             member.animations.add('bang');
         }, this);
-    
+        
+        this.shootSFX = this.add.audio('laserShot');
+        this.explosionSFX = this.add.audio('explosion');
+        this.music = this.add.audio('music');
+        this.music.play();
+        this.music.loopFull();
+        this.music.volume = 0.25;
         
         this.arrowKeys = this.input.keyboard.createCursorKeys();
         
@@ -132,7 +143,7 @@ BasicGame.Game.prototype = {
     
     shootBullet: function(){
         if(this.playerNextBullet < this.time.now){
-            var bullet = this.bulletGrp.getFirstExists(false);
+            var bullet = this.bulletGrp.getFirstDead();
 
             if(!bullet){
                 return;
@@ -140,11 +151,12 @@ BasicGame.Game.prototype = {
 
             bullet.reset(this.player.x, this.player.y-32);
             bullet.body.velocity.y = -500;  
+            this.shootSFX.play();
             
             this.playerNextBullet = this.time.now + this.BULLET_DELAY;
         };
     },
-    
+
     enemyHit: function(bullet, enemy){
         console.log("Enemy Hit");
         bullet.kill();
@@ -153,18 +165,19 @@ BasicGame.Game.prototype = {
     },
     
     blownUp: function(target){
-        var pop = this.explosionGrp.getFirstExists(false);
+        var pop = this.explosionGrp.getFirstDead();
         if(!pop){
             return;
         }
         
         pop.reset(target.x, target.y);
         pop.play('bang', 15, false, true);
+        this.explosionSFX.play();
     },
     
     spawnEnemy: function(){
         if(this.nextEnemy < this.time.now){
-            var enemy = this.enemyGrp.getFirstExists(false);
+            var enemy = this.enemyGrp.getFirstDead();
             if(!enemy){
                 return;
             };
