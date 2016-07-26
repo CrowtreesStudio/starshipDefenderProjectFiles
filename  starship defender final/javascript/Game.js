@@ -33,6 +33,9 @@ BasicGame.Game.prototype = {
         this.physics.startSystem(Phaser.Physics.ARCADE);
         
         this.nextEnemy = this.time.now + this.rnd.integerInRange(1000, 2000);
+        
+        this.score = 0;
+        this.gameOver = false;
 
     },
     
@@ -61,6 +64,7 @@ BasicGame.Game.prototype = {
         this.player.anchor.setTo(0.5, 0.5);
         this.player.animations.add('fly', [0, 1, 2], 30, true);
         this.player.play('fly');
+        this.player.health = 3;
         this.physics.arcade.enable(this.player);
         this.player.body.collideWorldBounds = true;
         
@@ -81,6 +85,7 @@ BasicGame.Game.prototype = {
         this.enemyGrp.setAll('outOfBoundsKill', true);
         this.enemyGrp.setAll('anchor.x', 0.5);
         this.enemyGrp.setAll('anchor.y', 0.5);
+        this.enemyGrp.setAll('value', 10, false, false, 0, true);
         this.enemyGrp.forEach(function(enemy){
             enemy.animations.add('fly', [0, 1, 2], 15, true);
             enemy.play('fly');
@@ -94,16 +99,52 @@ BasicGame.Game.prototype = {
             member.animations.add('bang');
         }, this);
         
+        this.livesTxt = this.add.text(35,
+                                      24,
+                                      "Lives:",
+                                      {font:'24px arial', fill:'#856f91'});
+        this.livesGrp = this.add.group();
+        this.livesGrp.x = this.livesTxt.width+43;
+        for(i = 0; i < this.player.health; i++){
+            var shipSprite = this.add.sprite(i*40, 24, 'player');
+            shipSprite.scale.setTo(0.5);
+            this.livesGrp.add(shipSprite);
+        };
+        
+        this.scoreTxt = this.add.text(620,
+                                      24,
+                                      "Score: "+this.score,
+                                      {font:'24px arial', fill:'#856f91'});
+        
+        this.gameOverTxt = this.add.text(this.world.centerX,
+                                         this.world.centerY,
+                                         "Game Over",
+                                         {font:'48px arial', fill:'#856f91'});
+        this.gameOverTxt.anchor.setTo(0.5);
+        
+        this.playAgainTxt = this.add.text(this.world.centerX,
+                                          this.world.centerY+this.gameOverTxt.height,
+                                          "Play Again?\n Y / N",
+                                          {font:'24px arial', fill:'#856f91', align:'center'});
+        this.playAgainTxt.anchor.setTo(0.5);
+        
+        this.endGameTextGrp = this.add.group();
+        this.endGameTextGrp.add(this.playAgainTxt);
+        this.endGameTextGrp.add(this.gameOverTxt);
+        this.endGameTextGrp.alpha = 0;
+        
         this.shootSFX = this.add.audio('laserShot');
         this.explosionSFX = this.add.audio('explosion');
         this.music = this.add.audio('music');
-        this.music.play();
+        /*this.music.play();
         this.music.loopFull();
-        this.music.volume = 0.25;
+        this.music.volume = 0.25;*/
         
         this.arrowKeys = this.input.keyboard.createCursorKeys();
         
-        this.keyInput = this.input.keyboard.addKeys({'shoot': Phaser.Keyboard.SPACEBAR});
+        this.keyInput = this.input.keyboard.addKeys({'shoot': Phaser.Keyboard.SPACEBAR,
+                                                     'Yes': Phaser.Keyboard.Y,
+                                                     'No': Phaser.Keyboard.N});
 
     },
 
@@ -116,6 +157,12 @@ BasicGame.Game.prototype = {
                                     this.enemyHit,
                                     null,
                                     this);
+        this.physics.arcade.overlap(this.player,
+                                    this.enemyGrp,
+                                    this.playerHit,
+                                    null,
+                                    this);
+        
         this.spawnEnemy();
 
     },
@@ -124,20 +171,28 @@ BasicGame.Game.prototype = {
         
         this.player.body.velocity.setTo(0, 0);
         
-        if(this.arrowKeys.left.isDown){
-            this.player.body.velocity.x = -this.PLAYER_SPEED;
-        }else if(this.arrowKeys.right.isDown){
-            this.player.body.velocity.x = this.PLAYER_SPEED;
+        if(!this.gameOver){
+            if(this.arrowKeys.left.isDown){
+                this.player.body.velocity.x = -this.PLAYER_SPEED;
+            }else if(this.arrowKeys.right.isDown){
+                this.player.body.velocity.x = this.PLAYER_SPEED;
+            };
+
+            if(this.arrowKeys.up.isDown){
+                this.player.body.velocity.y = -this.PLAYER_SPEED;
+            }else if(this.arrowKeys.down.isDown){
+                this.player.body.velocity.y = this.PLAYER_SPEED;
+            };
+
+            if(this.keyInput.shoot.isDown){
+                this.shootBullet();
+            };
         };
         
-        if(this.arrowKeys.up.isDown){
-            this.player.body.velocity.y = -this.PLAYER_SPEED;
-        }else if(this.arrowKeys.down.isDown){
-            this.player.body.velocity.y = this.PLAYER_SPEED;
-        };
-        
-        if(this.keyInput.shoot.isDown){
-            this.shootBullet();
+        if(this.gameOver){
+            if(this.keyInput.Yes.isDown){
+                this.state.restart();
+            };
         };
     },
     
@@ -162,6 +217,21 @@ BasicGame.Game.prototype = {
         bullet.kill();
         enemy.kill();
         this.blownUp(enemy);
+        this.score += enemy.value;
+        this.scoreTxt.text = "Score: "+this.score;
+    },
+    
+    playerHit: function(player, enemy){
+        player.damage(1);
+        this.livesGrp.children[this.player.health].kill();
+        enemy.kill();
+        if(this.player.alive){
+            this.blownUp(enemy);
+        }else{
+            this.blownUp(player);
+            this.gameOver = true;
+            this.endGame();
+        };
     },
     
     blownUp: function(target){
@@ -186,6 +256,13 @@ BasicGame.Game.prototype = {
             
             this.nextEnemy = this.time.now + this.rnd.integerInRange(1000, 2000);
         };
+    },
+    
+    endGame: function(){
+        this.add.tween(this.endGameTextGrp).to({alpha: 1},
+                                               500,
+                                               Phaser.Easing.Linear.None,
+                                               true);
     },
     
     render:function(){
