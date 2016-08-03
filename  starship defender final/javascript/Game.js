@@ -167,7 +167,7 @@ BasicGame.Game.prototype = {
         this.shootSFX = this.add.audio('laserShot');
         this.explosionSFX = this.add.audio('explosion');
         this.music = this.add.audio('music');
-//        this.music.loopFull(0.25);
+        this.music.loopFull(0.25);
         
         /*****      Player Keyboard Input      *****/
         this.arrowKeys = this.input.keyboard.createCursorKeys();
